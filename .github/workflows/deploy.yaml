@@ -1,0 +1,36 @@
+name: Deploy Node.js to VPS
+
+on:
+  push:
+    branches:
+      - main  # Atau master, sesuaikan dengan branch Anda
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.PORT }}
+          script: |
+            # Masuk ke direktori projek (Sesuaikan foldernya)
+            mkdir -p /var/www/anonim-chat
+            cd /var/www/anonim-chat
+            
+            # Jika menggunakan git, pull data terbaru
+            # Jika belum ada git di VPS, Anda bisa gunakan rsync di step sebelumnya
+            # Tapi cara termudah adalah pull dari repo private Anda
+            git pull origin main
+            
+            # Install dependensi
+            npm install --production
+            
+            # Restart server menggunakan PM2
+            pm2 restart anonim-chat || pm2 start index.js --name "anonim-chat"
