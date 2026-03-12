@@ -1,37 +1,50 @@
-name: Deploy Node.js to VPS
+name: Deploy Node JS Simple
 
 on:
   push:
-    branches:
-      - main  # Atau master, sesuaikan dengan branch Anda
+    branches: [ "main" ]
 
 jobs:
   deploy:
+    name: Deploy to VPS
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Deploy to VPS via SSH
-        uses: appleboy/ssh-action@master
+      - name: Install ssh key
+        uses: webfactory/ssh-agent@v0.9.0
         with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.SSH_KEY }}
-          port: ${{ secrets.PORT }}
-          script: |
-            # Masuk ke direktori projek (Sesuaikan foldernya)
+          ssh-private-key: ${{ secrets.SSH_KEY }}
+
+      - name: Deploy Process
+        run: |
+          # 1. Masuk ke VPS dan jalankan perintah
+          ssh -p "${{ secrets.PORT }}" ${{ secrets.USERNAME }}@${{ secrets.HOST }} "
+            set -e
+            # Load NVM (Wajib agar npm/node terbaca)
+            export NVM_DIR=\"\$HOME/.nvm\"
+            [ -s \"\$NVM_DIR/nvm.sh\" ] && \. \"\$NVM_DIR/nvm.sh\"
+
+            # Pastikan folder tujuan ada
             mkdir -p /var/www/anonim-chat
             cd /var/www/anonim-chat
-            
-            # Jika menggunakan git, pull data terbaru
-            # Jika belum ada git di VPS, Anda bisa gunakan rsync di step sebelumnya
-            # Tapi cara termudah adalah pull dari repo private Anda
-            git pull origin main
-            
-            # Install dependensi
+
+            # Jika belum ada .git di sana, clone dulu. Jika sudah ada, pull.
+            if [ ! -d \".git\" ]; then
+              cd ..
+              rm -rf anonim-chat
+              git clone git@github.com:${{ github.repository }}.git anonim-chat
+              cd anonim-chat
+            else
+              git fetch --all
+              git reset --hard origin/main
+            fi
+
+            # Install & Update dependensi
             npm install --production
-            
-            # Restart server menggunakan PM2
-            pm2 restart anonim-chat || pm2 start index.js --name "anonim-chat"
+
+            # Restart PM2
+            pm2 restart anonim-chat || pm2 start index.js --name \"anonim-chat\"
+          "
