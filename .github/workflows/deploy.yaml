@@ -1,4 +1,4 @@
-name: Deploy Node JS Simple
+name: Deploy Node JS Laravel Style
 
 on:
   push:
@@ -6,7 +6,6 @@ on:
 
 jobs:
   deploy:
-    name: Deploy to VPS
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -17,40 +16,35 @@ jobs:
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SSH_KEY }}
-          
+
       - name: Add host to known_hosts
         run: |
           mkdir -p ~/.ssh
-          # Mengambil fingerprint VPS dan menyimpannya agar tidak diblokir
           ssh-keyscan -p "${{ secrets.PORT }}" "${{ secrets.HOST }}" >> ~/.ssh/known_hosts
 
-      - name: Deploy Process
+      - name: Package & Push
         run: |
-          # 1. Masuk ke VPS dan jalankan perintah
+          # Bungkus kode (abaikan node_modules)
+          tar -czf app.tar.gz --exclude='node_modules' --exclude='.git' .
+          
+          # Kirim ke VPS (Laravel Style)
+          scp -P "${{ secrets.PORT }}" app.tar.gz ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/var/www/anonim-chat.tar.gz
+
+      - name: Extract & Restart
+        run: |
           ssh -p "${{ secrets.PORT }}" ${{ secrets.USERNAME }}@${{ secrets.HOST }} "
             set -e
-            # Load NVM (Wajib agar npm/node terbaca)
             export NVM_DIR=\"\$HOME/.nvm\"
             [ -s \"\$NVM_DIR/nvm.sh\" ] && \. \"\$NVM_DIR/nvm.sh\"
 
-            # Pastikan folder tujuan ada
             mkdir -p /var/www/anonim-chat
             cd /var/www/anonim-chat
-
-            # Jika belum ada .git di sana, clone dulu. Jika sudah ada, pull.
-            if [ ! -d \".git\" ]; then
-              cd ..
-              rm -rf anonim-chat
-              git clone git@github.com:${{ github.repository }}.git anonim-chat
-              cd anonim-chat
-            else
-              git fetch --all
-              git reset --hard origin/main
-            fi
-
-            # Install & Update dependensi
+            
+            # Ekstrak file yang baru dikirim
+            tar -xzf /var/www/anonim-chat.tar.gz -C .
+            rm /var/www/anonim-chat.tar.gz
+            
+            # Install & Restart
             npm install --production
-
-            # Restart PM2
             pm2 restart anonim-chat || pm2 start index.js --name \"anonim-chat\"
           "
