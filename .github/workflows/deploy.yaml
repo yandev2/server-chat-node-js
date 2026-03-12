@@ -1,4 +1,4 @@
-name: Deploy Node JS Laravel Style
+name: Deploy Node JS Simple
 
 on:
   push:
@@ -24,30 +24,29 @@ jobs:
 
       - name: Package & Push
         run: |
-          # 1. Bungkus kode dan simpan hasilnya di folder luar (../)
-          tar -czf ../app.tar.gz --exclude='node_modules' --exclude='.git' --exclude='app.tar.gz' .
+          # Buat arsip di folder temp luar agar tidak terjadi 'file changed'
+          tar -czf /tmp/app.tar.gz --exclude='.git' --exclude='node_modules' .
           
-          # 2. Pindahkan kembali ke folder saat ini agar bisa dikirim
-          mv ../app.tar.gz .
-          
-          # 3. Kirim ke VPS
-          scp -P "${{ secrets.PORT }}" app.tar.gz ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/var/www/anonim-chat.tar.gz{ secrets.PORT }}" app.tar.gz ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/var/www/anonim-chat.tar.gz
+          # Kirim ke VPS
+          scp -P "${{ secrets.PORT }}" /tmp/app.tar.gz ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/var/www/anonim-chat.tar.gz
 
       - name: Extract & Restart
         run: |
-          ssh -p "${{ secrets.PORT }}" ${{ secrets.USERNAME }}@${{ secrets.HOST }} "
+          ssh -p "${{ secrets.PORT }}" ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
             set -e
-            export NVM_DIR=\"\$HOME/.nvm\"
-            [ -s \"\$NVM_DIR/nvm.sh\" ] && \. \"\$NVM_DIR/nvm.sh\"
+            # Load NVM agar npm/node terbaca
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
+            # Pastikan folder ada
             mkdir -p /var/www/anonim-chat
             cd /var/www/anonim-chat
             
-            # Ekstrak file yang baru dikirim
+            # Ekstrak file
             tar -xzf /var/www/anonim-chat.tar.gz -C .
             rm /var/www/anonim-chat.tar.gz
             
             # Install & Restart
             npm install --production
-            pm2 restart anonim-chat || pm2 start index.js --name \"anonim-chat\"
-          "
+            pm2 restart anonim-chat || pm2 start index.js --name "anonim-chat"
+          EOF
