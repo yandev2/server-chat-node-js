@@ -24,11 +24,14 @@ jobs:
 
       - name: Package & Push
         run: |
-          # Bungkus kode (abaikan node_modules)
-          tar -czf app.tar.gz --exclude='node_modules' --exclude='.git' .
+          # 1. Bungkus kode dan simpan hasilnya di folder luar (../)
+          tar -czf ../app.tar.gz --exclude='node_modules' --exclude='.git' --exclude='app.tar.gz' .
           
-          # Kirim ke VPS (Laravel Style)
-          scp -P "${{ secrets.PORT }}" app.tar.gz ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/var/www/anonim-chat.tar.gz
+          # 2. Pindahkan kembali ke folder saat ini agar bisa dikirim
+          mv ../app.tar.gz .
+          
+          # 3. Kirim ke VPS
+          scp -P "${{ secrets.PORT }}" app.tar.gz ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/var/www/anonim-chat.tar.gz{ secrets.PORT }}" app.tar.gz ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/var/www/anonim-chat.tar.gz
 
       - name: Extract & Restart
         run: |
